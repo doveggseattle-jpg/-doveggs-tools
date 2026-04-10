@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DovEggs 工厂生产单生成器</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=DM+Mono:wght@300;400&display=swap');
+
+  :root {
+    --gold: #B8975A;
+    --gold-light: #D4B07A;
+    --gold-pale: #F5EDD8;
+    --dark: #1A1814;
+    --mid: #3D3830;
+    --muted: #8C8070;
+    --bg: #FAF7F2;
+    --white: #FFFFFF;
+    --success: #4A7C59;
+    --warning: #C17D3C;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--dark);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .brand {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 42px;
+    font-weight: 300;
+    letter-spacing: 6px;
+    color: var(--dark);
+  }
+  .brand span { color: var(--gold); }
+  .subtitle {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+  .divider {
+    width: 60px;
+    height: 1px;
+    background: var(--gold);
+    margin: 20px auto 0;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--white);
+    border: 1px solid rgba(184,151,90,0.2);
+    border-radius: 2px;
+    padding: 40px;
+    width: 100%;
+    max-width: 680px;
+    box-shadow: 0 2px 40px rgba(26,24,20,0.06);
+  }
+
+  .step-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .card-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--dark);
+    margin-bottom: 24px;
+  }
+
+  /* ── Upload Zone ── */
+  .upload-zone {
+    border: 1.5px dashed rgba(184,151,90,0.4);
+    border-radius: 2px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: var(--bg);
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--gold);
+    background: var(--gold-pale);
+  }
+  .upload-zone input {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.6;
+  }
+  .upload-text {
+    font-size: 13px;
+    color: var(--mid);
+    line-height: 1.6;
+  }
+  .upload-text strong {
+    display: block;
+    color: var(--dark);
+    font-weight: 400;
+    margin-bottom: 4px;
+  }
+  .upload-hint {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 8px;
+    letter-spacing: 1px;
+  }
+
+  /* ── File Info ── */
+  .file-info {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--gold-pale);
+    border: 1px solid rgba(184,151,90,0.3);
+    border-radius: 2px;
+    margin-top: 16px;
+  }
+  .file-info.show { display: flex; }
+  .file-icon { font-size: 24px; }
+  .file-details { flex: 1; }
+  .file-name { font-size: 12px; color: var(--dark); }
+  .file-size { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .file-remove {
+    cursor: pointer; color: var(--muted); font-size: 18px;
+    padding: 4px; line-height: 1;
+    transition: color 0.2s;
+  }
+  .file-remove:hover { color: var(--dark); }
+
+  /* ── Button ── */
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    background: var(--dark);
+    color: var(--white);
+    border: none;
+    border-radius: 2px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    margin-top: 24px;
+    transition: all 0.3s ease;
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--gold);
+    color: var(--dark);
+  }
+  .btn:disabled {
+    opacity: 0.4; cursor: not-allowed;
+  }
+  .btn.processing {
+    background: var(--muted);
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  /* ── Progress ── */
+  .progress-wrap {
+    display: none;
+    margin-top: 24px;
+  }
+  .progress-wrap.show { display: block; }
+  .progress-bar-bg {
+    height: 2px;
+    background: rgba(184,151,90,0.2);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--gold);
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+  .progress-text {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 8px;
+    letter-spacing: 1px;
+  }
+
+  /* ── Result ── */
+  .result-card {
+    display: none;
+    margin-top: 24px;
+    padding: 24px;
+    border: 1px solid rgba(74,124,89,0.3);
+    background: rgba(74,124,89,0.05);
+    border-radius: 2px;
+  }
+  .result-card.show { display: block; }
+  .result-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .result-icon { font-size: 20px; }
+  .result-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px;
+    color: var(--success);
+  }
+  .result-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-box {
+    background: var(--white);
+    border: 1px solid rgba(184,151,90,0.15);
+    padding: 12px;
+    border-radius: 2px;
+    text-align: center;
+  }
+  .stat-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px;
+    color: var(--gold);
+    display: block;
+  }
+  .stat-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .btn-download {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    background: var(--success);
+    color: var(--white);
+    border: none;
+    border-radius: 2px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .btn-download:hover { background: #3d6b4a; }
+
+  /* ── Preview Table ── */
+  .preview-wrap {
+    display: none;
+    margin-top: 24px;
+    overflow-x: auto;
+  }
+  .preview-wrap.show { display: block; }
+  .preview-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  th {
+    background: var(--dark);
+    color: var(--white);
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 400;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(184,151,90,0.1);
+    color: var(--mid);
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  tr:nth-child(even) td { background: var(--bg); }
+  tr:hover td { background: var(--gold-pale); }
+  .tag-quote {
+    background: rgba(193,125,60,0.15);
+    color: var(--warning);
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+  .tag-ok {
+    background: rgba(74,124,89,0.12);
+    color: var(--success);
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-size: 9px;
+    letter-spacing: 1px;
+  }
+
+  /* ── Error ── */
+  .error-box {
+    display: none;
+    padding: 16px 20px;
+    background: rgba(180,60,60,0.08);
+    border: 1px solid rgba(180,60,60,0.2);
+    border-radius: 2px;
+    color: #b43c3c;
+    font-size: 12px;
+    margin-top: 16px;
+    line-height: 1.5;
+  }
+  .error-box.show { display: block; }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 48px;
+    text-align: center;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="brand">Dov<span>Eggs</span></div>
+  <div class="subtitle">Factory Production Sheet Generator</div>
+  <div class="divider"></div>
+</div>
+
+<div class="card">
+  <div class="step-label">Step 01</div>
+  <div class="card-title">上传 Matrixify 导出文件</div>
+
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" id="fileInput" accept=".xlsx,.xls" />
+    <div class="upload-icon">📂</div>
+    <div class="upload-text">
+      <strong>拖拽文件到此处，或点击选择</strong>
+      支持 Matrixify 导出的 Orders Excel 文件
+    </div>
+    <div class="upload-hint">仅支持 .xlsx 格式</div>
+  </div>
+
+  <div class="file-info" id="fileInfo">
+    <div class="file-icon">📊</div>
+    <div class="file-details">
+      <div class="file-name" id="fileName">—</div>
+      <div class="file-size" id="fileSize">—</div>
+    </div>
+    <div class="file-remove" id="fileRemove">✕</div>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <button class="btn" id="processBtn" disabled>生成工厂生产单</button>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar-bg">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-text" id="progressText">正在处理...</div>
+  </div>
+
+  <div class="result-card" id="resultCard">
+    <div class="result-header">
+      <div class="result-icon">✅</div>
+      <div class="result-title">生产单已生成</div>
+    </div>
+    <div class="result-stats">
+      <div class="stat-box">
+        <span class="stat-num" id="statTotal">0</span>
+        <span class="stat-label">总订单</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-num" id="statNormal">0</span>
+        <span class="stat-label">正式订单</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-num" id="statQuote">0</span>
+        <span class="stat-label">询价单</span>
+      </div>
+    </div>
+    <button class="btn-download" id="downloadBtn">⬇ 下载工厂生产单 .xlsx</button>
+  </div>
+
+  <div class="preview-wrap" id="previewWrap">
+    <div class="preview-label">预览（前10行）</div>
+    <table id="previewTable"></table>
+  </div>
+</div>
+
+<div class="footer">DOVEGGS · SEATTLE · INTERNAL TOOL</div>
+
+<script>
+// ── 数据映射 ──
+const METAL_MAP = [
+  ["10k solid yellow gold", "10K黄金"],
+  ["10k yellow gold",       "10K黄金"],
+  ["14k yellow gold",       "14K黄金"],
+  ["18k yellow gold",       "18K黄金"],
+  ["10k solid white gold",  "10K白金"],
+  ["10k white gold",        "10K白金"],
+  ["14k white gold",        "14K白金"],
+  ["18k white gold",        "18K白金"],
+  ["10k rose gold",         "10K玫瑰金"],
+  ["14k rose gold",         "14K玫瑰金"],
+  ["18k rose gold",         "18K玫瑰金"],
+  ["platinum",              "铂金PT950"],
+  ["sterling silver",       "银镀铂金（电厚金）"],
+  ["silver",                "银镀铂金（电厚金）"],
+];
+
+const HALLMARK_PREFIX = {
+  "10K黄金":       "G10K",
+  "14K黄金":       "G14K",
+  "18K黄金":       "G18K",
+  "10K白金":       "G10K",
+  "14K白金":       "G14K",
+  "18K白金":       "G18K",
+  "10K玫瑰金":     "G10K",
+  "14K玫瑰金":     "G14K",
+  "18K玫瑰金":     "G18K",
+  "铂金PT950":     "PT950",
+  "银镀铂金（电厚金）": "S925",
+};
+
+function normalizeMetal(str) {
+  if (!str) return null;
+  const low = str.toLowerCase().trim();
+  for (const [eng, chn] of METAL_MAP) {
+    if (low.includes(eng)) return chn;
+  }
+  return str;
+}
+
+function extractCt(text) {
+  if (!text) return null;
+  const m = String(text).match(/(\d+\.?\d*)\s*ct/i);
+  return m ? m[1] : null;
+}
+
+function generateHallmark(metalCn, ct) {
+  const prefix = HALLMARK_PREFIX[metalCn];
+  if (!prefix) return "（待填写）";
+  return prefix + (ct ? `，D${ct}ct` : "，D？ct");
+}
+
+function parseProperties(raw) {
+  if (!raw) return {};
+  const result = {};
+  const lines = String(raw).split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const m = trimmed.match(/^([^:]+?)(?:-\d+(?:-\d+)*)?\s*:\s*(.+)$/);
+    if (!m) continue;
+    const key = m[1].trim().toLowerCase();
+    let val = m[2].trim().replace(/\s*\|\s*\$[\d.]+$/, '').trim();
+    if (key.startsWith('_ymq') || key.includes('shipping')) continue;
+    if (['metal tone','setting metal','metal of setting','metal'].some(x => key.includes(x))) {
+      if (!result.metal) result.metal = val;
+    } else if (['moissanite','colored gem','center stone color','stone color'].some(x => key.includes(x))) {
+      result.stoneColor = val;
+    } else if (key.includes('center stone shape')) {
+      result.stoneShape = val;
+    } else if (key.includes('size') && key.includes('us')) {
+      result.ringSize = val;
+    } else if (['facts of the jewelry','center stone info','anything else'].some(x => key.includes(x))) {
+      result.notes = val;
+    } else if (key.includes('accent')) {
+      result.accents = val;
+    }
+  }
+  return result;
+}
+
+function buildStoneDesc(props, title) {
+  const parts = [];
+  if (props.stoneColor) parts.push(props.stoneColor);
+  if (props.stoneShape) parts.push(props.stoneShape);
+  if (props.accents)    parts.push(`付石：${props.accents}`);
+  if (parts.length) return parts.join('，');
+  const ct = extractCt(title);
+  return ct ? `${ct}ct` : "（待填写）";
+}
+
+// ── DOM refs ──
+const uploadZone  = document.getElementById('uploadZone');
+const fileInput   = document.getElementById('fileInput');
+const fileInfo    = document.getElementById('fileInfo');
+const fileName    = document.getElementById('fileName');
+const fileSize    = document.getElementById('fileSize');
+const fileRemove  = document.getElementById('fileRemove');
+const processBtn  = document.getElementById('processBtn');
+const progressWrap= document.getElementById('progressWrap');
+const progressBar = document.getElementById('progressBar');
+const progressText= document.getElementById('progressText');
+const resultCard  = document.getElementById('resultCard');
+const errorBox    = document.getElementById('errorBox');
+const previewWrap = document.getElementById('previewWrap');
+const previewTable= document.getElementById('previewTable');
+const downloadBtn = document.getElementById('downloadBtn');
+
+let currentFile = null;
+let outputWorkbook = null;
+
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.classList.add('show');
+}
+function hideError() { errorBox.classList.remove('show'); }
+
+function setProgress(pct, text) {
+  progressBar.style.width = pct + '%';
+  progressText.textContent = text;
+}
+
+// ── File handling ──
+function handleFile(file) {
+  if (!file) return;
+  if (!file.name.match(/\.xlsx?$/i)) {
+    showError('请上传 .xlsx 格式的文件（Matrixify 导出的订单文件）');
+    return;
+  }
+  hideError();
+  currentFile = file;
+  fileName.textContent = file.name;
+  fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+  fileInfo.classList.add('show');
+  processBtn.disabled = false;
+  resultCard.classList.remove('show');
+  previewWrap.classList.remove('show');
+}
+
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  handleFile(e.dataTransfer.files[0]);
+});
+fileRemove.addEventListener('click', () => {
+  currentFile = null;
+  fileInput.value = '';
+  fileInfo.classList.remove('show');
+  processBtn.disabled = true;
+  resultCard.classList.remove('show');
+  previewWrap.classList.remove('show');
+  hideError();
+});
+
+// ── Main processing ──
+processBtn.addEventListener('click', async () => {
+  if (!currentFile) return;
+  hideError();
+  processBtn.disabled = true;
+  processBtn.classList.add('processing');
+  processBtn.textContent = '处理中...';
+  progressWrap.classList.add('show');
+  resultCard.classList.remove('show');
+  previewWrap.classList.remove('show');
+  setProgress(10, '正在读取文件...');
+
+  try {
+    const buf = await currentFile.arrayBuffer();
+    setProgress(30, '正在解析订单数据...');
+
+    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+
+    setProgress(50, '正在整理字段...');
+
+    const orders = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const orderName   = row[1];
+      const lineId      = row[3];
+      const productTitle= row[4];
+      const sku         = row[7];
+      const propsRaw    = row[9];
+      const note        = row[10];
+      const lineType    = row[14];
+      const createdAt   = row[15];
+
+      if (!orderName || lineType !== 'Line Item') continue;
+
+      const isLoose = !sku && productTitle &&
+        ['lab grown diamond','certified','doveggs certified','loose stone']
+        .some(x => String(productTitle).toLowerCase().includes(x));
+      if (isLoose) continue;
+
+      const isQuote = !sku && productTitle &&
+        ['get a free quote','quote for semi mount','quote for setting']
+        .some(x => String(productTitle).toLowerCase().includes(x));
+
+      const props    = parseProperties(propsRaw);
+      const metalCn  = normalizeMetal(props.metal);
+      const stone    = buildStoneDesc(props, productTitle);
+      const ct       = extractCt(productTitle) || extractCt(stone);
+      const hallmark = metalCn ? generateHallmark(metalCn, ct) : "（待填写）";
+      const ringSize = props.ringSize ? `美${props.ringSize}` : "（待填写）";
+      const orderNum = String(orderName).replace('#', '');
+
+      let dateVal = createdAt;
+      if (typeof createdAt === 'string') {
+        const d = new Date(createdAt);
+        dateVal = isNaN(d) ? new Date() : d;
+      }
+
+      const extraNotes = [props.notes, note ? String(note) : ''].filter(Boolean).join(' ').trim();
+
+      orders.push({
+        date:     dateVal,
+        sku:      sku || '（询价单）',
+        remarks:  isQuote ? '画图' : '',
+        stone,
+        metal:    metalCn || '（待填写）',
+        hallmark,
+        ringSize,
+        orderNum: `独立站${orderNum}`,
+        notes:    extraNotes,
+        isQuote,
+      });
+    }
+
+    setProgress(70, '正在生成工厂生产单...');
+
+    // ── Build output workbook ──
+    const outWb = XLSX.utils.book_new();
+    const headers = ['日期','序号','款号','备注要求','产品图示','石头大小','戒托材质','字印','圈号','网站','setting','CVD','备注'];
+    const sheetData = [headers];
+
+    for (let i = 0; i < orders.length; i++) {
+      const o = orders[i];
+      const dateStr = o.date instanceof Date
+        ? `${o.date.getFullYear()}-${String(o.date.getMonth()+1).padStart(2,'0')}-${String(o.date.getDate()).padStart(2,'0')}`
+        : String(o.date || '').slice(0,10);
+      sheetData.push([
+        dateStr,
+        i + 1,
+        o.sku,
+        o.remarks,
+        '',
+        o.stone,
+        o.metal,
+        o.hallmark,
+        o.ringSize,
+        o.orderNum,
+        '',
+        '',
+        o.notes,
+      ]);
+    }
+
+    const outWs = XLSX.utils.aoa_to_sheet(sheetData);
+
+    // Column widths
+    outWs['!cols'] = [
+      {wch:12},{wch:6},{wch:14},{wch:14},{wch:12},
+      {wch:30},{wch:14},{wch:20},{wch:10},{wch:14},
+      {wch:10},{wch:10},{wch:24}
+    ];
+
+    XLSX.utils.book_append_sheet(outWb, outWs, '工厂生产单');
+    outputWorkbook = outWb;
+
+    setProgress(100, '完成！');
+
+    // Stats
+    const total  = orders.length;
+    const quotes = orders.filter(o => o.isQuote).length;
+    const normal = total - quotes;
+    document.getElementById('statTotal').textContent  = total;
+    document.getElementById('statNormal').textContent = normal;
+    document.getElementById('statQuote').textContent  = quotes;
+
+    resultCard.classList.add('show');
+
+    // Preview
+    buildPreview(orders.slice(0, 10));
+    previewWrap.classList.add('show');
+
+  } catch (err) {
+    showError('处理出错：' + err.message + '\n请确认上传的是 Matrixify 订单导出文件。');
+    progressWrap.classList.remove('show');
+  } finally {
+    processBtn.classList.remove('processing');
+    processBtn.disabled = false;
+    processBtn.textContent = '重新生成';
+  }
+});
+
+// ── Preview ──
+function buildPreview(orders) {
+  const cols = ['款号','戒托材质','石头大小','字印','圈号','网站','类型'];
+  let html = '<thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  for (const o of orders) {
+    const tag = o.isQuote
+      ? '<span class="tag-quote">询价</span>'
+      : '<span class="tag-ok">正式</span>';
+    html += `<tr>
+      <td title="${o.sku}">${o.sku}</td>
+      <td>${o.metal}</td>
+      <td title="${o.stone}">${o.stone}</td>
+      <td>${o.hallmark}</td>
+      <td>${o.ringSize}</td>
+      <td>${o.orderNum}</td>
+      <td>${tag}</td>
+    </tr>`;
+  }
+  html += '</tbody>';
+  previewTable.innerHTML = html;
+}
+
+// ── Download ──
+downloadBtn.addEventListener('click', () => {
+  if (!outputWorkbook) return;
+  const today = new Date();
+  const ds = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(outputWorkbook, `DovEggs工厂生产单_${ds}.xlsx`);
+});
+</script>
+</body>
+</html>
